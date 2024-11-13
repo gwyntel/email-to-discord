@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const bodyParser = require('body-parser');
 const fetch = require('node-fetch');
@@ -10,8 +11,24 @@ app.use(bodyParser.json({
     limit: '50mb' // Support large payloads for attachments
 }));
 
-// Configuration - Replace this with your Discord webhook URL
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+// Webhook mapping configuration
+// Format: 'recipient@domain.com': 'discord_webhook_url'
+const WEBHOOK_MAPPING = {};
+
+// Load webhook mappings from environment variables
+// Format: WEBHOOK_MAP_email_example_com=discord_webhook_url
+Object.keys(process.env).forEach(key => {
+    if (key.startsWith('WEBHOOK_MAP_')) {
+        // Convert environment variable name to email
+        // e.g., WEBHOOK_MAP_email_example_com -> email@example.com
+        const email = key.replace('WEBHOOK_MAP_', '')
+            .replace(/_plus_/g, '+')  // Handle + in email addresses
+            .replace(/_/g, '.')
+            .replace(/DOT/g, '.')
+            .replace(/AT/g, '@');
+        WEBHOOK_MAPPING[email] = process.env[key];
+    }
+});
 
 // Convert base64 size to MB for logging
 const getBase64Size = (base64String) => {
@@ -81,14 +98,42 @@ const createAttachmentEmbeds = (attachments, inlines) => {
     return embeds;
 };
 
+// Helper function to get Discord webhook URL for a recipient
+const getWebhookUrl = (recipient) => {
+    // Check if there's a direct mapping for this email
+    if (WEBHOOK_MAPPING[recipient]) {
+        return WEBHOOK_MAPPING[recipient];
+    }
+
+    // Check if there's a catch-all webhook
+    if (WEBHOOK_MAPPING['*']) {
+        return WEBHOOK_MAPPING['*'];
+    }
+
+    // Fallback to the default webhook URL if set
+    return process.env.DISCORD_WEBHOOK_URL;
+};
+
 app.post('/webhook', async (req, res) => {
     try {
-        if (!DISCORD_WEBHOOK_URL) {
-            throw new Error('Discord webhook URL not configured');
-        }
-
         const emailData = req.body;
         
+        // Get all unique recipient emails
+        const recipients = emailData.to.map(to => to.email);
+        const webhookUrls = new Set();
+
+        // Collect all relevant webhook URLs
+        recipients.forEach(recipient => {
+            const webhookUrl = getWebhookUrl(recipient);
+            if (webhookUrl) {
+                webhookUrls.add(webhookUrl);
+            }
+        });
+
+        if (webhookUrls.size === 0) {
+            throw new Error('No webhook URLs configured for the recipient(s)');
+        }
+
         // Create the main email embed
         const emailEmbed = createEmailEmbed(emailData);
         
@@ -105,20 +150,28 @@ app.post('/webhook', async (req, res) => {
             embeds: [emailEmbed, ...attachmentEmbeds]
         };
 
-        // Send to Discord
-        const response = await fetch(DISCORD_WEBHOOK_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(discordPayload)
+        // Send to all configured Discord webhooks
+        const sendPromises = Array.from(webhookUrls).map(async webhookUrl => {
+            const response = await fetch(webhookUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(discordPayload)
+            });
+
+            if (!response.ok) {
+                throw new Error(`Discord API error for ${webhookUrl}: ${response.statusText}`);
+            }
         });
 
-        if (!response.ok) {
-            throw new Error(`Discord API error: ${response.statusText}`);
-        }
+        // Wait for all webhook sends to complete
+        await Promise.all(sendPromises);
 
-        res.status(200).json({ status: 'success' });
+        res.status(200).json({ 
+            status: 'success',
+            webhooks_triggered: webhookUrls.size
+        });
     } catch (error) {
         console.error('Error processing webhook:', error);
         res.status(500).json({ 
@@ -130,10 +183,28 @@ app.post('/webhook', async (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'healthy' });
+    const mappings = Object.keys(WEBHOOK_MAPPING);
+    res.status(200).json({ 
+        status: 'healthy',
+        webhook_mappings: mappings.length,
+        configured_emails: mappings.filter(m => m !== '*')
+    });
+});
+
+// Root endpoint to show basic info
+app.get('/', (req, res) => {
+    res.status(200).json({
+        name: 'Email to Discord Webhook Converter',
+        endpoints: {
+            webhook: '/webhook',
+            health: '/health'
+        },
+        configured_mappings: Object.keys(WEBHOOK_MAPPING).length
+    });
 });
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
+    console.log('Configured webhook mappings:', Object.keys(WEBHOOK_MAPPING));
     console.log('Waiting for email webhooks...');
 });
