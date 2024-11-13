@@ -18,11 +18,13 @@ const WEBHOOK_MAPPING = {};
 // Helper to convert config key to email
 // e.g., WEBHOOK_MAP_SPLINTERTREE_GWYNTEL_US -> splintertree@gwyntel.us
 const configKeyToEmail = (key) => {
-    const email = key.replace('WEBHOOK_MAP_', '')
+    // Handle both MAP and MATCH prefixes
+    const email = key.replace(/WEBHOOK_(MAP|MATCH)_/, '')
         .replace(/_plus_/gi, '+')  // Handle + in email addresses
-        .toLowerCase() // Convert to lowercase
-        .split('_')   // Split by underscore
-        .join('.');   // Join with dots
+        .replace(/-/g, '.')        // Convert hyphens to dots
+        .toLowerCase()             // Convert to lowercase
+        .split('_')               // Split by underscore
+        .join('.');               // Join with dots
     
     // If it has exactly one @ symbol, it's already an email
     if ((email.match(/@/g) || []).length === 1) {
@@ -40,15 +42,40 @@ const configKeyToEmail = (key) => {
     return email;
 };
 
+// Helper function to get Discord webhook URL for a recipient
+const getWebhookUrl = (recipient) => {
+    const recipientLower = recipient.toLowerCase();
+    console.log(`Looking up webhook for recipient: ${recipientLower}`); // Debug logging
+    console.log('Available mappings:', Object.keys(WEBHOOK_MAPPING)); // Debug logging
+    
+    // Check if there's a direct mapping for this email
+    if (WEBHOOK_MAPPING[recipientLower]) {
+        console.log(`Found direct mapping for ${recipientLower}`); // Debug logging
+        return WEBHOOK_MAPPING[recipientLower];
+    }
+
+    // Check if there's a catch-all webhook
+    if (WEBHOOK_MAPPING['CATCHALL']) {
+        console.log('Using catchall webhook'); // Debug logging
+        return WEBHOOK_MAPPING['CATCHALL'];
+    }
+
+    // Fallback to the default webhook URL if set
+    console.log('Using default webhook URL'); // Debug logging
+    return process.env.DISCORD_WEBHOOK_URL;
+};
+
 // Load webhook mappings from environment variables
 Object.keys(process.env).forEach(key => {
-    if (key.startsWith('WEBHOOK_MAP_')) {
-        if (key === 'WEBHOOK_MAP_CATCHALL') {
+    // Check for both MAP and MATCH prefixes
+    if (key.startsWith('WEBHOOK_MAP_') || key.startsWith('WEBHOOK_MATCH_')) {
+        if (key.endsWith('_CATCHALL')) {
             // Handle catch-all webhook separately
             WEBHOOK_MAPPING['CATCHALL'] = process.env[key];
         } else {
             const email = configKeyToEmail(key);
             WEBHOOK_MAPPING[email] = process.env[key];
+            console.log(`Loaded mapping for email: ${email} from key: ${key}`); // Debug logging
         }
     }
 });
@@ -119,22 +146,6 @@ const createAttachmentEmbeds = (attachments, inlines) => {
     }
 
     return embeds;
-};
-
-// Helper function to get Discord webhook URL for a recipient
-const getWebhookUrl = (recipient) => {
-    // Check if there's a direct mapping for this email
-    if (WEBHOOK_MAPPING[recipient.toLowerCase()]) {
-        return WEBHOOK_MAPPING[recipient.toLowerCase()];
-    }
-
-    // Check if there's a catch-all webhook
-    if (WEBHOOK_MAPPING['CATCHALL']) {
-        return WEBHOOK_MAPPING['CATCHALL'];
-    }
-
-    // Fallback to the default webhook URL if set
-    return process.env.DISCORD_WEBHOOK_URL;
 };
 
 app.post('/webhook', async (req, res) => {
@@ -244,3 +255,12 @@ app.listen(port, () => {
     );
     console.log('Waiting for email webhooks...');
 });
+
+// Export functions for testing
+module.exports = {
+    configKeyToEmail,
+    getWebhookUrl,
+    createEmailEmbed,
+    createAttachmentEmbeds,
+    WEBHOOK_MAPPING
+};

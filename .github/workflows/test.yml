@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x, 20.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run tests
+      run: npm test
+      env:
+        WEBHOOK_MAP_SUPPORT_EXAMPLE_COM: https://discord.com/api/webhooks/123/abc
+        WEBHOOK_MATCH_SALES_TEAM_EXAMPLE_COM: https://discord.com/api/webhooks/456/def
+        WEBHOOK_MAP_CATCHALL: https://discord.com/api/webhooks/789/ghi
+        DISCORD_WEBHOOK_URL: https://discord.com/api/webhooks/000/xyz

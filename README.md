@@ -11,6 +11,7 @@ This service converts ImprovMX email webhooks to Discord webhooks. It receives e
 - Handles email attachments and inline images
 - Shows attachment information (name, type, size)
 - Configurable through environment variables
+- Automated testing with GitHub Actions
 
 ## Webhook Mapping
 
@@ -23,9 +24,12 @@ The service supports three ways to map emails to Discord webhooks:
 ### Configuration Examples
 
 ```bash
-# Direct mapping for specific emails
+# Direct mapping for specific emails (supports both MAP and MATCH prefixes)
 WEBHOOK_MAP_support_example_com=https://discord.com/api/webhooks/123/abc
-WEBHOOK_MAP_sales_example_com=https://discord.com/api/webhooks/456/def
+WEBHOOK_MATCH_sales_example_com=https://discord.com/api/webhooks/456/def
+
+# Support for hyphens in email addresses
+WEBHOOK_MAP_support-tickets_example_com=https://discord.com/api/webhooks/789/jkl
 
 # Catch-all webhook for any unmapped email
 WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/789/ghi
@@ -34,7 +38,11 @@ WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/789/ghi
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/000/xyz
 ```
 
-Note: Replace dots (.) with underscores (_) in email addresses when setting environment variables.
+Note: 
+- Replace dots (.) with underscores (_) in email addresses when setting environment variables
+- Both `WEBHOOK_MAP_` and `WEBHOOK_MATCH_` prefixes are supported
+- Hyphens (-) in email addresses are supported and will be converted to dots (.) automatically
+- Example: For email "support-tickets@example.com", use `WEBHOOK_MAP_support-tickets_example_com`
 
 ## Local Setup
 
@@ -47,10 +55,12 @@ npm install
    ```bash
    # Windows
    set WEBHOOK_MAP_email_example_com=https://discord.com/api/webhooks/...
+   set WEBHOOK_MATCH_support-tickets_example_com=https://discord.com/api/webhooks/...
    set WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
 
    # Unix/Linux/MacOS
    export WEBHOOK_MAP_email_example_com=https://discord.com/api/webhooks/...
+   export WEBHOOK_MATCH_support-tickets_example_com=https://discord.com/api/webhooks/...
    export WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
    ```
 
@@ -58,6 +68,26 @@ npm install
 ```bash
 npm start
 ```
+
+## Testing
+
+### Local Testing
+
+Run the test suite locally:
+```bash
+npm test
+```
+
+### Continuous Integration
+
+This project uses GitHub Actions for automated testing. The workflow:
+- Runs on push to main/master branches
+- Runs on pull requests to main/master branches
+- Tests against Node.js versions 16.x, 18.x, and 20.x
+- Automatically sets up test environment variables
+- Runs the full test suite
+
+View test results in the Actions tab of the GitHub repository.
 
 ## Heroku Deployment
 
@@ -68,8 +98,9 @@ heroku create your-app-name
 
 2. Set your webhook mappings in Heroku:
 ```bash
-# Direct mapping
+# Direct mapping (supports both MAP and MATCH prefixes)
 heroku config:set WEBHOOK_MAP_support_example_com=https://discord.com/api/webhooks/...
+heroku config:set WEBHOOK_MATCH_support-tickets_example_com=https://discord.com/api/webhooks/...
 
 # Catch-all webhook (use CATCHALL instead of * for Heroku compatibility)
 heroku config:set WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
@@ -154,7 +185,7 @@ The service converts the email to a Discord message with embeds:
 
 - `PORT`: Server port (default: 3000)
 - `WEBHOOK_MAP_CATCHALL`: Catch-all webhook URL for unmapped emails
-- `WEBHOOK_MAP_[email]`: Specific email mapping (replace dots with underscores)
+- `WEBHOOK_MAP_[email]` or `WEBHOOK_MATCH_[email]`: Specific email mapping (replace dots with underscores)
 - `DISCORD_WEBHOOK_URL`: Legacy fallback webhook URL
 
 ## Limitations
@@ -164,6 +195,7 @@ The service converts the email to a Discord message with embeds:
 - File size limits apply based on Discord's restrictions
 - Environment variable names must use underscores instead of dots for email addresses
 - Heroku config vars don't support * character, use CATCHALL instead
+- Hyphens in email addresses are automatically converted to dots
 
 ## Development
 
@@ -183,3 +215,19 @@ git commit -m 'Add some amazing feature'
 git push origin feature/amazing-feature
 ```
 5. Open a Pull Request
+
+### Testing
+
+The project includes a comprehensive test suite:
+- Unit tests for email address conversion
+- Tests for webhook URL resolution
+- Environment variable loading tests
+- Support for both MAP and MATCH prefixes
+- Hyphen handling in email addresses
+
+Tests are automatically run on:
+- Every push to main/master
+- Every pull request
+- Local development (`npm test`)
+
+The GitHub Actions workflow ensures tests pass across multiple Node.js versions.
