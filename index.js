@@ -211,7 +211,7 @@ app.get('/health', (req, res) => {
         status: 'healthy',
         webhook_mappings: mappings.length,
         configured_emails: mappings.filter(m => m !== 'CATCHALL').map(email => ({
-            config_key: `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/@/g, '_').toUpperCase()}`,
+            config_key: `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/\+/g, '_plus_').toUpperCase()}`,
             email: email
         }))
     });
@@ -239,7 +239,7 @@ app.listen(port, () => {
         Object.keys(WEBHOOK_MAPPING).map(email => ({
             email,
             config_key: email === 'CATCHALL' ? 'WEBHOOK_MAP_CATCHALL' :
-                `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/@/g, '_').toUpperCase()}`
+                `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/\+/g, '_plus_').toUpperCase()}`
         }))
     );
     console.log('Waiting for email webhooks...');
