@@ -19,14 +19,19 @@ const WEBHOOK_MAPPING = {};
 // Format: WEBHOOK_MAP_email_example_com=discord_webhook_url
 Object.keys(process.env).forEach(key => {
     if (key.startsWith('WEBHOOK_MAP_')) {
-        // Convert environment variable name to email
-        // e.g., WEBHOOK_MAP_email_example_com -> email@example.com
-        const email = key.replace('WEBHOOK_MAP_', '')
-            .replace(/_plus_/g, '+')  // Handle + in email addresses
-            .replace(/_/g, '.')
-            .replace(/DOT/g, '.')
-            .replace(/AT/g, '@');
-        WEBHOOK_MAPPING[email] = process.env[key];
+        if (key === 'WEBHOOK_MAP_CATCHALL') {
+            // Handle catch-all webhook separately
+            WEBHOOK_MAPPING['CATCHALL'] = process.env[key];
+        } else {
+            // Convert environment variable name to email
+            // e.g., WEBHOOK_MAP_email_example_com -> email@example.com
+            const email = key.replace('WEBHOOK_MAP_', '')
+                .replace(/_plus_/g, '+')  // Handle + in email addresses
+                .replace(/_/g, '.')
+                .replace(/DOT/g, '.')
+                .replace(/AT/g, '@');
+            WEBHOOK_MAPPING[email] = process.env[key];
+        }
     }
 });
 
@@ -106,8 +111,8 @@ const getWebhookUrl = (recipient) => {
     }
 
     // Check if there's a catch-all webhook
-    if (WEBHOOK_MAPPING['*']) {
-        return WEBHOOK_MAPPING['*'];
+    if (WEBHOOK_MAPPING['CATCHALL']) {
+        return WEBHOOK_MAPPING['CATCHALL'];
     }
 
     // Fallback to the default webhook URL if set
@@ -187,7 +192,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'healthy',
         webhook_mappings: mappings.length,
-        configured_emails: mappings.filter(m => m !== '*')
+        configured_emails: mappings.filter(m => m !== 'CATCHALL')
     });
 });
 

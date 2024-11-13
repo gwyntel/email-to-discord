@@ -28,7 +28,7 @@ WEBHOOK_MAP_support_example_com=https://discord.com/api/webhooks/123/abc
 WEBHOOK_MAP_sales_example_com=https://discord.com/api/webhooks/456/def
 
 # Catch-all webhook for any unmapped email
-WEBHOOK_MAP_*=https://discord.com/api/webhooks/789/ghi
+WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/789/ghi
 
 # Default fallback webhook (legacy support)
 DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/000/xyz
@@ -47,11 +47,11 @@ npm install
    ```bash
    # Windows
    set WEBHOOK_MAP_email_example_com=https://discord.com/api/webhooks/...
-   set WEBHOOK_MAP_*=https://discord.com/api/webhooks/...
+   set WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
 
    # Unix/Linux/MacOS
    export WEBHOOK_MAP_email_example_com=https://discord.com/api/webhooks/...
-   export WEBHOOK_MAP_*=https://discord.com/api/webhooks/...
+   export WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
    ```
 
 3. Start the server:
@@ -71,8 +71,8 @@ heroku create your-app-name
 # Direct mapping
 heroku config:set WEBHOOK_MAP_support_example_com=https://discord.com/api/webhooks/...
 
-# Catch-all webhook
-heroku config:set WEBHOOK_MAP_*=https://discord.com/api/webhooks/...
+# Catch-all webhook (use CATCHALL instead of * for Heroku compatibility)
+heroku config:set WEBHOOK_MAP_CATCHALL=https://discord.com/api/webhooks/...
 ```
 
 3. Deploy to Heroku:
@@ -139,6 +139,7 @@ The service converts the email to a Discord message with embeds:
 
 - `POST /webhook`: Main endpoint for receiving ImprovMX webhooks
 - `GET /health`: Health check endpoint (includes count of configured webhook mappings)
+- `GET /`: Root endpoint showing service information
 
 ## Error Handling
 
@@ -152,7 +153,7 @@ The service converts the email to a Discord message with embeds:
 ## Environment Variables
 
 - `PORT`: Server port (default: 3000)
-- `WEBHOOK_MAP_*`: Catch-all webhook URL
+- `WEBHOOK_MAP_CATCHALL`: Catch-all webhook URL for unmapped emails
 - `WEBHOOK_MAP_[email]`: Specific email mapping (replace dots with underscores)
 - `DISCORD_WEBHOOK_URL`: Legacy fallback webhook URL
 
@@ -162,6 +163,7 @@ The service converts the email to a Discord message with embeds:
 - Maximum of 10 embeds per message
 - File size limits apply based on Discord's restrictions
 - Environment variable names must use underscores instead of dots for email addresses
+- Heroku config vars don't support * character, use CATCHALL instead
 
 ## Development
 
