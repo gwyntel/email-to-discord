@@ -15,21 +15,39 @@ app.use(bodyParser.json({
 // Format: 'recipient@domain.com': 'discord_webhook_url'
 const WEBHOOK_MAPPING = {};
 
+// Helper to convert config key to email
+// e.g., WEBHOOK_MAP_SPLINTERTREE_GWYNTEL_US -> splintertree@gwyntel.us
+const configKeyToEmail = (key) => {
+    const email = key.replace('WEBHOOK_MAP_', '')
+        .replace(/_plus_/gi, '+')  // Handle + in email addresses
+        .toLowerCase() // Convert to lowercase
+        .split('_')   // Split by underscore
+        .join('.');   // Join with dots
+    
+    // If it has exactly one @ symbol, it's already an email
+    if ((email.match(/@/g) || []).length === 1) {
+        return email;
+    }
+    
+    // Otherwise, insert @ before the domain (last two segments)
+    const parts = email.split('.');
+    if (parts.length >= 2) {
+        const domainParts = parts.slice(-2); // Get last two segments
+        const localPart = parts.slice(0, -2).join('.'); // Get everything else
+        return `${localPart}@${domainParts.join('.')}`;
+    }
+    
+    return email;
+};
+
 // Load webhook mappings from environment variables
-// Format: WEBHOOK_MAP_email_example_com=discord_webhook_url
 Object.keys(process.env).forEach(key => {
     if (key.startsWith('WEBHOOK_MAP_')) {
         if (key === 'WEBHOOK_MAP_CATCHALL') {
             // Handle catch-all webhook separately
             WEBHOOK_MAPPING['CATCHALL'] = process.env[key];
         } else {
-            // Convert environment variable name to email
-            // e.g., WEBHOOK_MAP_email_example_com -> email@example.com
-            const email = key.replace('WEBHOOK_MAP_', '')
-                .replace(/_plus_/g, '+')  // Handle + in email addresses
-                .replace(/_/g, '.')
-                .replace(/DOT/g, '.')
-                .replace(/AT/g, '@');
+            const email = configKeyToEmail(key);
             WEBHOOK_MAPPING[email] = process.env[key];
         }
     }
@@ -106,8 +124,8 @@ const createAttachmentEmbeds = (attachments, inlines) => {
 // Helper function to get Discord webhook URL for a recipient
 const getWebhookUrl = (recipient) => {
     // Check if there's a direct mapping for this email
-    if (WEBHOOK_MAPPING[recipient]) {
-        return WEBHOOK_MAPPING[recipient];
+    if (WEBHOOK_MAPPING[recipient.toLowerCase()]) {
+        return WEBHOOK_MAPPING[recipient.toLowerCase()];
     }
 
     // Check if there's a catch-all webhook
@@ -192,7 +210,10 @@ app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'healthy',
         webhook_mappings: mappings.length,
-        configured_emails: mappings.filter(m => m !== 'CATCHALL')
+        configured_emails: mappings.filter(m => m !== 'CATCHALL').map(email => ({
+            config_key: `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/@/g, '_').toUpperCase()}`,
+            email: email
+        }))
     });
 });
 
@@ -204,12 +225,22 @@ app.get('/', (req, res) => {
             webhook: '/webhook',
             health: '/health'
         },
-        configured_mappings: Object.keys(WEBHOOK_MAPPING).length
+        configured_mappings: Object.keys(WEBHOOK_MAPPING).length,
+        example_config: {
+            email: "splintertree@gwyntel.us",
+            config_var: "WEBHOOK_MAP_SPLINTERTREE_GWYNTEL_US"
+        }
     });
 });
 
 app.listen(port, () => {
     console.log(`Server running on port ${port}`);
-    console.log('Configured webhook mappings:', Object.keys(WEBHOOK_MAPPING));
+    console.log('Configured webhook mappings:', 
+        Object.keys(WEBHOOK_MAPPING).map(email => ({
+            email,
+            config_key: email === 'CATCHALL' ? 'WEBHOOK_MAP_CATCHALL' :
+                `WEBHOOK_MAP_${email.replace(/\./g, '_').replace(/@/g, '_').toUpperCase()}`
+        }))
+    );
     console.log('Waiting for email webhooks...');
 });
