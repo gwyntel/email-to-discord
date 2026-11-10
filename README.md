@@ -1,3 +1,5 @@
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/gwyntel/email-to-discord)
+
 # Email to Discord Webhook Converter
 
 ## Overview
